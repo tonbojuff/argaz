@@ -1,0 +1,276 @@
+  <!DOCTYPE html>
+  <html lang="es">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>OpenLight Pro - RAW & Levels</title>
+      <style>
+          :root {
+              --bg-dark: #1a1a1a;
+              --bg-panel: #252525;
+              --accent: #3a86ff;
+              --text: #e0e0e0;
+              --border: #333;
+          }
+
+          body {
+              margin: 0;
+              font-family: 'Segoe UI', sans-serif;
+              background-color: var(--bg-dark);
+              color: var(--text);
+              display: flex;
+              height: 100vh;
+              overflow: hidden;
+          }
+
+          #viewport {
+              flex: 1;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 40px;
+              background-color: #111;
+              overflow: auto;
+          }
+
+          canvas {
+              box-shadow: 0 0 30px rgba(0,0,0,0.8);
+              max-width: 100%;
+          }
+
+          #tools-panel {
+              width: 340px;
+              background-color: var(--bg-panel);
+              border-left: 1px solid var(--border);
+              display: flex;
+              flex-direction: column;
+              padding: 20px;
+              box-sizing: border-box;
+              overflow-y: auto;
+          }
+
+          h2 { font-size: 1.2rem; margin-bottom: 20px; color: var(--accent); border-bottom: 1px solid var(--border);
+  padding-bottom: 10px; }
+
+          .section-title {
+              font-size: 0.7rem;
+              text-transform: uppercase;
+              color: #888;
+              margin: 20px 0 10px 0;
+              letter-spacing: 1px;
+              display: flex;
+              justify-content: space-between;
+          }
+
+          .control-group { margin-bottom: 15px; }
+
+          .control-group label {
+              display: block;
+              font-size: 0.85rem;
+              margin-bottom: 8px;
+              display: flex;
+              justify-content: space-between;
+          }
+
+          input[type="range"] { width: 100%; cursor: pointer; accent-color: var(--accent); }
+
+          .btn {
+              background-color: var(--accent);
+              color: white;
+              border: none;
+              padding: 12px;
+              border-radius: 4px;
+              cursor: pointer;
+              font-weight: bold;
+              width: 100%;
+              margin-bottom: 10px;
+          }
+
+          .btn-success { background-color: #2ecc71; }
+          .btn-secondary { background-color: #555; }
+          .raw-badge {
+              background: #e67e22;
+              color: white;
+              font-size: 0.6rem;
+              padding: 2px 5px;
+              border-radius: 3px;
+              display: none;
+          }
+      </style>
+  </head>
+  <body>
+
+      <div id="viewport">
+          <canvas id="canvas"></canvas>
+      </div>
+
+      <div id="tools-panel">
+          <h2>OpenLight Pro <span id="raw-indicator" class="raw-badge">RAW MODE</span></h2>
+
+          <input type="file" id="upload" hidden accept="image/*,.arw,.cr2,.nef,.orf">
+          <button class="btn" onclick="document.getElementById('upload').click()">Cargar Foto (Soporta RAW)</button>
+
+          <div class="section-title">Luminosidad <span>Niveles</span></div>
+
+          <div class="control-group">
+              <label>Blanco (Highlights) <span id="val-white">255</span></label>
+              <input type="range" id="white" min="0" max="255" value="255">
+          </div>
+
+          <div class="control-group">
+              <label>Negro (Shadows) <span id="val-black">0</span></label>
+              <input type="range" id="black" min="0" max="255" value="0">
+          </div>
+
+          <div class="section-title">Transformación</div>
+
+          <div class="control-group">
+              <label>Rotación <span id="val-rotate">0°</span></label>
+              <input type="range" id="rotate" min="0" max="360" value="0">
+          </div>
+
+          <div class="section-title">Detalle</div>
+
+          <div class="control-group">
+              <label>Nitidez <span id="val-sharpen">0</span></label>
+              <input type="range" id="sharpen" min="0" max="100" value="0">
+          </div>
+
+          <div style="margin-top: auto;">
+              <button class="btn btn-success" onclick="saveAsJpg()">Guardar como JPG</button>
+              <button class="btn btn-secondary" onclick="resetAll()">Resetear</button>
+          </div>
+      </div>
+
+      <script>
+          const canvas = document.getElementById('canvas');
+          const ctx = canvas.getContext('2d');
+          const upload = document.getElementById('upload');
+          let img = new Image();
+          let isRaw = false;
+
+          const inputs = {
+              rotate: document.getElementById('rotate'),
+              white: document.getElementById('white'),
+              black: document.getElementById('black'),
+              sharpen: document.getElementById('sharpen')
+          };
+
+          upload.onchange = (e) => {
+              const file = e.target.files[0];
+              const ext = file.name.split('.').pop().toLowerCase();
+              const rawExtensions = ['arw', 'cr2', 'nef', 'orf'];
+
+              isRaw = rawExtensions.includes(ext);
+              document.getElementById('raw-indicator').style.display = isRaw ? 'inline' : 'none';
+
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                  img.src = event.target.result;
+                  img.onload = () => {
+                      canvas.width = img.width;
+                      canvas.height = img.height;
+                      applyAll();
+                  };
+              };
+              reader.readAsDataURL(file);
+          };
+
+          function applyAll() {
+              if (!img.src) return;
+
+              const angle = parseInt(inputs.rotate.value) * Math.PI / 180;
+
+              // Ajuste de lienzo para rotación
+              const cos = Math.abs(Math.cos(angle));
+              const sin = Math.abs(Math.sin(angle));
+              canvas.width = img.width * cos + img.height * sin;
+              canvas.height = img.width * sin + img.height * cos;
+
+              ctx.save();
+              ctx.translate(canvas.width / 2, canvas.height / 2);
+              ctx.rotate(angle);
+              ctx.drawImage(img, -img.width / 2, -img.height / 2);
+              ctx.restore();
+
+              // --- PROCESAMIENTO DE NIVELES (BLANCOS Y NEGROS) ---
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const data = imageData.data;
+              const whiteLimit = parseInt(inputs.white.value);
+              const blackLimit = parseInt(inputs.black.value);
+
+              for (let i = 0; i < data.length; i += 4) {
+                  for (let c = 0; c < 3; c++) {
+                      let val = data[i + c];
+
+                      // Algoritmo de re-mapeo de niveles
+                      // (valor - negro) * 255 / (blanco - negro)
+                      val = ((val - blackLimit) * 255) / (whiteLimit - blackLimit);
+
+                      data[i + c] = Math.max(0, Math.min(255, val));
+                  }
+              }
+              ctx.putImageData(imageData, 0, 0);
+
+              // --- NITIDEZ ---
+              const sharpenVal = parseInt(inputs.sharpen.value);
+              if (sharpenVal > 0) {
+                  const finalData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  ctx.putImageData(sharpenImage(finalData, sharpenVal), 0, 0);
+              }
+
+              document.getElementById('val-white').innerText = inputs.white.value;
+              document.getElementById('val-black').innerText = inputs.black.value;
+              document.getElementById('val-rotate').innerText = inputs.rotate.value + '°';
+              document.getElementById('val-sharpen').innerText = inputs.sharpen.value;
+          }
+
+          function sharpenImage(imageData, amount) {
+              const w = imageData.width;
+              const h = imageData.height;
+              const input = imageData.data;
+              const output = new Uint8ClampedArray(input.length);
+              const strength = amount / 100;
+              const center = 5 * strength + (1 - strength);
+              const edge = -1 * strength;
+
+              for (let y = 1; y < h - 1; y++) {
+                  for (let x = 1; x < w - 1; x++) {
+                      for (let c = 0; c < 3; c++) {
+                          const i = (y * w + x) * 4 + c;
+                          const val = input[((y-1)*w + x)*4 + c] * 0 +
+                                      input[(y*w + (x-1))*4 + c] * edge +
+                                      input[(y*w + x)*4 + c] * center +
+                                      input[(y*w + (x+1))*4 + c] * edge +
+                                      input[((y+1)*w + x)*4 + c] * 0;
+                          output[i] = val;
+                      }
+                      output[(y * w + x) * 4 + 3] = 255;
+                  }
+              }
+              return new ImageData(output, w, h);
+          }
+
+          function saveAsJpg() {
+              if (!img.src) return;
+              const link = document.createElement('a');
+              link.download = 'openlight-export.jpg';
+              // El segundo parámetro '0.9' es la calidad del JPG (90%)
+              link.href = canvas.toDataURL('image/jpeg', 0.9);
+              link.click();
+          }
+
+          function resetAll() {
+              inputs.rotate.value = 0;
+              inputs.white.value = 255;
+              inputs.black.value = 0;
+              inputs.sharpen.value = 0;
+              applyAll();
+          }
+
+          Object.values(inputs).forEach(input => {
+              input.addEventListener('input', applyAll);
+          });
+      </script>
+  </body>
+  </html>

@@ -1,0 +1,48 @@
+  {
+    "name": "OpenLight Pro Editor",
+    "short_name": "OpenLight",
+    "start_url": "index.html",
+    "display": "standalone",
+    "background_color": "#1a1a1a",
+    "theme_color": "#3a86ff",
+    "icons": [
+      {
+        "src": "icon-192.png",
+        "sizes": "192x192",
+        "type": "image/png"
+      },
+      {
+        "src": "icon-512.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ]
+  }
+
+  📄 Archivo 3: sw.js
+
+  Copia este código y guárdalo como sw.js:
+  const CACHE_NAME = 'openlight-v1';
+  const ASSETS = [
+    './',
+    './index.html',
+    './manifest.json'
+  ];
+
+  self.addEventListener('install', (e) => {
+    e.waitUntil(
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.addAll(ASSETS);
+      })
+    );
+  });
+
+  self.addEventListener('fetch', (e) => {
+    e.respondWith(
+      caches.match(e.request).then((response) => {
+        return response || fetch(e.request);
+      })
+    );
+  });
+
+  ---
